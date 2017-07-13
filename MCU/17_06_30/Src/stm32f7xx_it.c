@@ -40,7 +40,7 @@
 extern char flag_spi1_rx;
 extern char flag_adc_fin;
 extern char flag_rock_received;
-
+volatile char flag_debug_2 = 0;
 extern int spi1_temp;
 extern int spi1_temp2;
 extern int SPI4_CS[3];
@@ -259,15 +259,15 @@ void TIM1_TRG_COM_TIM11_IRQHandler(void)
     if((Lora_que.front != Lora_que.rear))       //Lora
     {
       temp_char = que_pop(&Lora_que);
-      UART4->TDR = temp_char;
-      USART3->TDR = temp_char;
+      UART5->TDR = temp_char;
+      //USART3->TDR = temp_char;
     }
     if((Gyro_que.front != Gyro_que.rear))       //Gyro
     {
       temp_char = que_pop(&Gyro_que);
       //USART3_TDR =temp_char;
     }
-    if((Rock_que.front != Rock_que.rear))       //Gyro
+    if((Rock_que.front != Rock_que.rear))       //Rock
     {
       temp_char = que_pop(&Rock_que);
     }
@@ -287,18 +287,9 @@ void TIM2_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM2_IRQn 0 */
   if((TIM2->SR & (0x01)) == 0x01)   //update -> CS LOW   //0
-  {      
+  {
     GPIOE->ODR &= ~(SPI4_CS[SPI4_index]);       //index 0 1 2
     SPI4->CR1 |= 0x40;
-    /* //for check amp
-    DAC->DHR12R1 = dac_data;
-    DAC->DHR12R2 = dac_data;
-    dac_data++;
-    if(dac_data>3700)
-    {
-      dac_data=3700;
-    }
-    */
   }
   if( (TIM2->SR & (0x02)) == 0x02)   //compare1 -> SPI start     //300
   {
@@ -328,8 +319,8 @@ void TIM2_IRQHandler(void)
 void TIM3_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM3_IRQn 0 */
-  
-  if((TIM3->SR & (0x01)) == 0x01)         //set
+    
+  if((TIM3->SR)&(0x02))       //compare1  set point
   {
     if((Rock.recieve_buffer[3])&0x10)     //left on PE0
     {
@@ -339,16 +330,17 @@ void TIM3_IRQHandler(void)
     {
       GPIOE->BSRR = 0x2;
     }
-    if((Rock.recieve_buffer[3])&0x08)     //warning on
+    if((Rock.recieve_buffer[3])&0x04)     //warning on
     {
       GPIOE->BSRR = 0x3;
     }
   }
-  
-  if((TIM3->SR & (0x02)) == 0x02)       //compare1  half point
+  if((TIM3->SR)& (0x04))   //compare2 reset point
   {
     GPIOE->BSRR = 0x30000;       //off all
+    flag_debug_2 = 0xff;
   }
+  TIM3->SR=0;
   /* USER CODE END TIM3_IRQn 0 */
   HAL_TIM_IRQHandler(&htim3);
   /* USER CODE BEGIN TIM3_IRQn 1 */

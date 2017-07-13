@@ -42,15 +42,18 @@
 
 DAC_HandleTypeDef hdac;
 
+SPI_HandleTypeDef hspi2;
 SPI_HandleTypeDef hspi4;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart3;
+UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
@@ -61,7 +64,7 @@ UART_HandleTypeDef huart3;
 volatile char flag_spi1_rx = 0;
 volatile char flag_adc_fin = 0;
 volatile char flag_rock_received = 0;
-
+volatile char flag_debug_1=0;
 
 volatile int spi1_temp = 0;
 volatile int spi1_temp2 = 0;
@@ -117,6 +120,9 @@ static void MX_TIM11_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_UART5_Init(void);
+static void MX_TIM5_Init(void);
+static void MX_USART6_UART_Init(void);
+static void MX_SPI2_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -161,14 +167,18 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM3_Init();
   MX_UART5_Init();
+  MX_TIM5_Init();
+  MX_USART6_UART_Init();
+  MX_SPI2_Init();
 
   /* USER CODE BEGIN 2 */
     
   GPIOE->ODR |= 0x800;   //PE11 HIGH
   SPI4->CR2 |= 0x40;
   
-  TIM3->DIER |= 0x01;   //UIE
+  //TIM3->DIER |= 0x01;   //UIE
   TIM3->DIER |= 0x02;   //CC1IE
+  TIM3->DIER |= 0x04;   //CC2IE
   
   TIM2->CR1 |= 0x01;
   TIM2->DIER |= 0x0F;
@@ -220,12 +230,12 @@ int main(void)
     DAC->DHR12R2 = 3000;
     HAL_Delay(1000);
     */
-    GPIOE->BSRR=0x20;
+    //GPIOE->BSRR=0x20;
     HAL_Delay(1000);
-    GPIOE->BSRR=0x200000;
+    //GPIOE->BSRR=0x200000;
     HAL_Delay(1000);
     Lora_transmit();
-    Rock_transmit();
+    //Rock_transmit();
     Rock_recieve();
   /* USER CODE END WHILE */
 
@@ -281,11 +291,12 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART3|RCC_PERIPHCLK_UART4
-                              |RCC_PERIPHCLK_UART5;
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART3|RCC_PERIPHCLK_USART6
+                              |RCC_PERIPHCLK_UART4|RCC_PERIPHCLK_UART5;
   PeriphClkInitStruct.Usart3ClockSelection = RCC_USART3CLKSOURCE_PCLK1;
   PeriphClkInitStruct.Uart4ClockSelection = RCC_UART4CLKSOURCE_PCLK1;
   PeriphClkInitStruct.Uart5ClockSelection = RCC_UART5CLKSOURCE_PCLK1;
+  PeriphClkInitStruct.Usart6ClockSelection = RCC_USART6CLKSOURCE_PCLK2;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -329,6 +340,31 @@ static void MX_DAC_Init(void)
     /**DAC channel OUT2 config 
     */
   if (HAL_DAC_ConfigChannel(&hdac, &sConfig, DAC_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+}
+
+/* SPI2 init function */
+static void MX_SPI2_Init(void)
+{
+
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+  hspi2.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 7;
+  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -429,9 +465,9 @@ static void MX_TIM3_Init(void)
   TIM_OC_InitTypeDef sConfigOC;
 
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 49999;
+  htim3.Init.Prescaler = 666;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 665;
+  htim3.Init.Period = 50050;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -458,10 +494,74 @@ static void MX_TIM3_Init(void)
   }
 
   sConfigOC.OCMode = TIM_OCMODE_TIMING;
-  sConfigOC.Pulse = 332;
+  sConfigOC.Pulse = 2;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
   if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sConfigOC.Pulse = 25025;
+  if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+}
+
+/* TIM5 init function */
+static void MX_TIM5_Init(void)
+{
+
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+  TIM_IC_InitTypeDef sConfigIC;
+
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 0;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 10000000;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_TIM_IC_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim5, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_TIM_IC_ConfigChannel(&htim5, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (HAL_TIM_ConfigTI1Input(&htim5, TIM_TI1SELECTION_XORCOMBINATION) != HAL_OK)
   {
     Error_Handler();
   }
@@ -548,6 +648,27 @@ static void MX_USART3_UART_Init(void)
 
 }
 
+/* USART6 init function */
+static void MX_USART6_UART_Init(void)
+{
+
+  huart6.Instance = USART6;
+  huart6.Init.BaudRate = 115200;
+  huart6.Init.WordLength = UART_WORDLENGTH_7B;
+  huart6.Init.StopBits = UART_STOPBITS_1;
+  huart6.Init.Parity = UART_PARITY_NONE;
+  huart6.Init.Mode = UART_MODE_TX_RX;
+  huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart6.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart6.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart6.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+}
+
 /** Configure pins as 
         * Analog 
         * Input 
@@ -563,9 +684,10 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
@@ -626,38 +748,39 @@ void Lora_transmit(void)
   if((flag_adc_fin != 1)&&(Lora_que.front != Lora_que.rear))
   {
     return ;
+  }else
+  {
+    
+    flag_adc_fin=0;
+    TIM11->CR1 &= ~(0x1); //timer off
+    
+    que_push_str(&Lora_que,"AT+DATA=\t");
+    write_timelaps(&Lora_que,Lora_timelaps);
+    Lora_timelaps++;
+    
+    
+    SPI4_MPPT = ((SPI4_MPPT-2110.3-10.42)*0.0268777);
+    SPI4_BATT = ((SPI4_BATT-2110.3)*0.0268777);
+    SPI4_MOTOR = ((SPI4_MOTOR-2110.3)*0.0268777);
+    
+    
+    //write_num(batt_volatge);
+    //que_push_str("[V]\t");
+    
+    que_push(&Lora_que,'\t');
+    write_num(&Lora_que,SPI4_MPPT);       
+    que_push_str(&Lora_que,"A\t");
+    write_num(&Lora_que,SPI4_BATT);       
+    que_push_str(&Lora_que,"A\t");
+    write_num(&Lora_que,SPI4_MOTOR);       
+    que_push_str(&Lora_que,"A\t");
+    
+    
+    que_push(&Lora_que, 13);
+    que_push(&Lora_que, 10);
+    
+    TIM11->CR1 |= 0x1;    //timer on
   }
-  
-  flag_adc_fin=0;
-  TIM11->CR1 &= ~(0x1); //timer off
-  
-  que_push_str(&Lora_que,"AT+DATA=\t");
-  write_timelaps(&Lora_que,Lora_timelaps);
-  Lora_timelaps++;
-  
-  /*
-  SPI4_MPPT = ((SPI4_MPPT-3102)*6.4453125);
-  SPI4_BATT = ((SPI4_BATT-3102)*6.4453125);
-  SPI4_MOTOR = ((SPI4_MOTOR-3102)*6.4453125);
-  */
-  
-  //write_num(batt_volatge);
-  //que_push_str("[V]\t");
-
-  que_push(&Lora_que,'\t');
-  write_num(&Lora_que,SPI4_MPPT);       
-  que_push_str(&Lora_que,"A\t");
-  write_num(&Lora_que,SPI4_BATT);       
-  que_push_str(&Lora_que,"A\t");
-  write_num(&Lora_que,SPI4_MOTOR);       
-  que_push_str(&Lora_que,"A\t");
-  
-  
-  que_push(&Lora_que, 13);
-  que_push(&Lora_que, 10);
-  
-  TIM11->CR1 |= 0x1;    //timer on
-  
 }
 void Rock_transmit(void)
 {
@@ -682,11 +805,14 @@ void Rock_recieve(void)
   
   
   Control.throtle = ( ( (Rock.recieve_buffer[1])&0x1F )<<5 )|((Rock.recieve_buffer[2])&0x1F);
+  DAC->DHR12R1 = (Control.throtle)*4;
+  DAC->DHR12R2 = (Control.throtle)*4; 
   
   //LED
   if((Rock.recieve_buffer[3])&0x10)     //left on PE0
   {
     TIM3->CR1 |= 0x1;    //timer on
+    flag_debug_1 = 0x0f;
   }
   if((Rock.recieve_buffer[3])&0x08)     //right on PE1
   {
@@ -695,21 +821,23 @@ void Rock_recieve(void)
   if((Rock.recieve_buffer[3])&0x04)     //warinig on
   {
     TIM3->CR1 |= 0x1;    //timer on
+    flag_debug_1 = 0x0f;
   }
-  if((Rock.recieve_buffer[3])&0x1C == 0)
+  if( ((Rock.recieve_buffer[3])&0x1C) == 0)
   {
     GPIOE->BSRR = 0x30000;       //turn off both LED
-    TIM3->CR1 &= ~(0x1);        //interrupt off
-    TIM3->CNT = 1;              //Timer reset
+    TIM3->CR1 &= ~(0x1);        //Timer off
+    TIM3->CNT = 0;              //Timer reset
+    flag_debug_1 = 0xff;
   }
   
   //horn
   if((Rock.recieve_buffer[3])&0x02)     //horn PE3
   {
-    GPIOE->BSRR = 0x08;
+    GPIOE->BSRR = 0x04;
   }else
   {
-    GPIOE->BSRR = 0x80000;
+    GPIOE->BSRR = 0x40000;
   }
 }
 void write_timelaps(struct que_struct *Q, int Num)
